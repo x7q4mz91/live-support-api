@@ -1,4 +1,4 @@
-name = "live-support-chat"
+name = "live-support-api"
 main = "src/index.ts"
 compatibility_date = "2026-09-15"
 
