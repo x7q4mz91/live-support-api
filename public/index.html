@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5efe4">
+  <title>Live support</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600&display=swap');
+    :root { --ink:#20302c; --muted:#6d7970; --paper:#f5efe4; --panel:#fffdf8; --line:#ddd8cd; --accent:#e06b45; --accent-dark:#bd4f30; --agent:#e7eee6; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; color:var(--ink); background:radial-gradient(circle at 8% 12%, #f1d7b8 0 12%, transparent 32%), radial-gradient(circle at 94% 90%, #d5e1d0 0 14%, transparent 34%), var(--paper); font-family:'DM Sans', sans-serif; }
+    main { width:min(100% - 32px, 860px); margin:0 auto; padding:56px 0 40px; }
+    .eyebrow { color:var(--accent-dark); font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+    h1 { margin:10px 0 12px; font-family:Fraunces, serif; font-size:clamp(38px, 7vw, 68px); font-weight:600; line-height:.98; letter-spacing:0; }
+    .intro { max-width:510px; color:var(--muted); font-size:16px; line-height:1.6; }
+    .chat { display:grid; grid-template-rows:auto 1fr auto; min-height:560px; margin-top:32px; overflow:hidden; background:rgba(255,253,248,.9); border:1px solid rgba(221,216,205,.95); border-radius:8px; box-shadow:0 22px 60px rgba(67,58,43,.12); }
+    .chat-head { display:flex; align-items:center; gap:14px; padding:20px 24px; border-bottom:1px solid var(--line); }
+    .status { width:11px; height:11px; border-radius:50%; background:#6eaa69; box-shadow:0 0 0 5px #e2efde; }
+    .chat-head strong { display:block; font-size:15px; }
+    .chat-head span { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
+    .messages { display:flex; flex-direction:column; gap:14px; padding:26px 24px; overflow:auto; }
+    .message { max-width:min(78%, 580px); padding:13px 16px; border-radius:8px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.5; animation:rise .25s ease both; }
+    .message.agent { align-self:flex-start; background:var(--agent); border-bottom-left-radius:2px; }
+    .message.visitor { align-self:flex-end; color:#fff; background:var(--accent); border-bottom-right-radius:2px; }
+    .empty { margin:auto; color:var(--muted); font-size:14px; text-align:center; }
+    .composer { display:flex; gap:10px; padding:18px 20px 20px; border-top:1px solid var(--line); }
+    textarea { flex:1; min-height:48px; max-height:130px; resize:vertical; padding:13px 14px; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:6px; font:inherit; outline:none; }
+    textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(224,107,69,.14); }
+    button { align-self:flex-end; min-height:48px; padding:0 20px; color:#fff; background:var(--ink); border:0; border-radius:6px; font:700 14px 'DM Sans',sans-serif; cursor:pointer; transition:background .2s, transform .2s; }
+    button:hover { background:#314a43; transform:translateY(-1px); }
+    button:disabled { opacity:.55; cursor:wait; transform:none; }
+    .error { min-height:18px; padding:0 24px 14px; color:#b8442c; font-size:12px; }
+    @keyframes rise { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+    @media (max-width:560px) { main { width:min(100% - 20px, 860px); padding-top:32px; } .chat { min-height:calc(100vh - 220px); margin-top:24px; } .messages { padding:20px 14px; } .chat-head { padding:17px 16px; } .composer { padding:14px 12px 12px; } .message { max-width:88%; } button { padding:0 15px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">Customer care</div>
+    <h1>How can we help?</h1>
+    <p class="intro">Send us a message and a member of our team will reply here as soon as possible.</p>
+    <section class="chat" aria-label="Live support chat">
+      <header class="chat-head"><i class="status" aria-hidden="true"></i><div><strong>Support inbox</strong><span>Your message is delivered securely</span></div></header>
+      <div class="messages" id="messages"><p class="empty" id="empty">Your conversation will appear here.</p></div>
+      <form class="composer" id="composer"><textarea id="input" maxlength="2000" rows="1" placeholder="Write your message..." aria-label="Message"></textarea><button id="send" type="submit">Send</button></form>
+      <div class="error" id="error" role="status" aria-live="polite"></div>
+    </section>
+  </main>
+  <script>
+    const visitorId = localStorage.getItem('supportVisitorId') || crypto.randomUUID().replaceAll('-', '');
+    localStorage.setItem('supportVisitorId', visitorId);
+    const messages = document.querySelector('#messages');
+    const empty = document.querySelector('#empty');
+    const form = document.querySelector('#composer');
+    const input = document.querySelector('#input');
+    const send = document.querySelector('#send');
+    const error = document.querySelector('#error');
+    let rendered = 0;
+
+    function render(items) {
+      if (!items.length) return;
+      empty.remove();
+      for (const item of items.slice(rendered)) {
+        const bubble = document.createElement('div');
+        bubble.className = `message ${item.role === 'agent' ? 'agent' : 'visitor'}`;
+        bubble.textContent = item.content;
+        messages.append(bubble);
+      }
+      rendered = items.length;
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    async function refresh() {
+      try {
+        const response = await fetch(`/api/messages?visitor=${encodeURIComponent(visitorId)}`);
+        if (!response.ok) return;
+        render((await response.json()).messages || []);
+      } catch (_) { /* next poll retries */ }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const content = input.value.trim();
+      if (!content || send.disabled) return;
+      send.disabled = true;
+      error.textContent = '';
+      try {
+        const response = await fetch('/api/messages', { method:'POST', headers:{'content-type':'application/json'}, body:JSON.stringify({ visitorId, content }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to send your message.');
+        input.value = '';
+        await refresh();
+      } catch (reason) { error.textContent = reason.message; }
+      finally { send.disabled = false; input.focus(); }
+    });
+
+    refresh();
+  </script>
+</body>
+</html>
