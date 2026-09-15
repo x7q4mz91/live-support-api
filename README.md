@@ -22,6 +22,11 @@ Create the D1 database and put the returned database ID in `wrangler.toml`:
 npx wrangler d1 create live-support
 ```
 
+This command prints a result containing a `database_id` value. Copy that value
+over `REPLACE_WITH_D1_DATABASE_ID` in `wrangler.toml` before running any remote
+migration or deploy. The placeholder is intentionally invalid and Cloudflare
+will reject it with error 10021.
+
 Run the migration remotely:
 
 ```sh
