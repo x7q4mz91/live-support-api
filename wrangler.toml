@@ -9,6 +9,6 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "live-support"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "930a73f8-0b78-45a2-a514-39fb2edcf704"
 migrations_dir = "migrations"
 
